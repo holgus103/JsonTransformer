@@ -51,18 +51,24 @@ processObject ops = do
 processField :: Monad m => [Op] -> ConduitM Char Char m ()
 processField ops =  do
     fieldName <- getFieldName
-    -- if all (\x -> case x of
-    --             Removal [fieldName] -> False
-    --             _ -> True
-    --         ) ops then do { yieldMany fieldName; yield ':'; processUnknownValue ops;} else return ()
-    yieldMany fieldName
-    yield ':'
-    processUnknownValue ops;
-    val <- peekC
-    case val of 
-        Nothing -> return ()
-        Just x -> if x == '}' then return ()
-                  else do {yield ','; processField ops} 
+    if all (\x -> case x of
+                -- check if field needs to be removed
+                Removal [name] -> name /= fieldName 
+                _ -> True
+            ) ops then do 
+                -- write field to output with it's value
+                { yieldMany fieldName; yield ':'; processUnknownValue ops; nextField True;} 
+                else do
+                -- keep droping field
+                {dropField; nextField False}
+    where
+        nextField :: Monad m => Bool -> ConduitM Char Char m ()
+        nextField persisted = do         
+            val <- peekC
+            case val of 
+                Nothing -> return ()
+                Just x -> if x == '}' then return ()
+                        else do {if persisted then  yield ',' else return (); processField ops} 
 
 getFieldName :: Monad m => ConduitM Char o m [Char]
 getFieldName = do
@@ -79,6 +85,12 @@ getFieldValue = do
     val <- takeWhileC (\x -> x /= ',' && x /= '}') .| sinkList
     dropWhileC (\x -> x == ',' || x == '}')
     yieldMany val
+
+dropField :: Monad m => ConduitM Char Char m ()
+dropField = do
+    dropWhileC (/=',')
+    dropC 1
+    -- dropWhileC (\x -> x == ' ' || (x /= '{' && x /= '[' && x /= ',' && x /= '}')) 
 
 
     

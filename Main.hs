@@ -5,21 +5,24 @@ import System.Environment
 import TransformsParser
 import ConduitReader
 import Conduit
+import Control.Monad
+import Flow
+
 
 testString :: String
-testString = "{\"asd\":val,\"asd2\":val2}"
+testString = "{\"a\":a,\"b\":b, \"c\": c}"
 
 args :: IO [String]
-args = return ["del .asd"]
+args = return ["del .a,", "del .b"]
 
-main :: IO ()
+
 main = 
     args 
     >>= processArgs 
     >>= (\ops->
-    runConduit $ yieldMany testString 
+     runConduit $ yieldMany testString 
     .| processUnknownStart ops
-    .| mapM_C print
+    .| sinkList
     )
     
 
