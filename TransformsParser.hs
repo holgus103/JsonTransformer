@@ -9,15 +9,14 @@ import Control.Monad
 import Data.Char
 import Data.List
 
-parseArgs :: IO [Op]
-parseArgs = do
-    args <- getArgs
-    Prelude.concat args |> processArgs |> return 
 
-processArgs :: String -> [Op]
+
+processArgs :: [String] -> IO [Op]
 processArgs args = 
-    splitOn "," args
+    Prelude.concat args
+    |> splitOn ","
     |> Prelude.map parseOperation 
+    |> return
 
 
 parseOperation :: String -> Op
@@ -57,9 +56,7 @@ parseRemove s =
                 _ -> Nothing)
     else Nothing
 
-processField :: ([String] -> Op) -> String -> String -> [String] -> Maybe Op
-
-
+processField :: ([String] -> Op) -> String -> String -> [String] -> Maybe Op    
 processField op (y:ys) acc res = 
     case y of 
         -- encountered next field
