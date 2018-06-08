@@ -10,10 +10,10 @@ import Flow
 
 
 testString :: String
-testString = "{\"a\":a,\"b\":b, \"c\": c}"
+testString = "{\"a\":a,\"b\":b, \"c\": c, \"d\":d, \"e\": e}"
 
 args :: IO [String]
-args = return ["del .a,", "del .b"]
+args = return ["del .a,", "del .b,", "del .d"]
 
 
 main = 

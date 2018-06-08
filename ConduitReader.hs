@@ -9,7 +9,9 @@ import Operations
 
 -- run = runConduit $ yieldMany testString .| processUknownStart .| sinkList
 
-processUnknownStart :: Monad m => [Op] -> ConduitM Char Char m ()
+type CharConduit m = ConduitM Char Char m ()
+
+processUnknownStart :: Monad m => [Op] -> CharConduit m
 processUnknownStart ops = do
     -- check first character
     val <- peekC 
@@ -22,7 +24,7 @@ processUnknownStart ops = do
         -- if none of the above keep dropping chars 
         Just x ->  do {takeWhileC (\x -> x /= '[' && x /= '{'); processUnknownStart ops}
 
-processUnknownValue :: Monad m => [Op] -> ConduitM Char Char m ()
+processUnknownValue :: Monad m => [Op] -> CharConduit m
 processUnknownValue ops = do
     val <- peekC 
     case val of
@@ -32,13 +34,13 @@ processUnknownValue ops = do
         Just ' ' -> do { takeWhileC (==' '); processUnknownValue ops}
         Just x -> getFieldValue
 
-processArray :: Monad m => ConduitM Char Char m ()
+processArray :: Monad m => CharConduit m
 processArray = do
     dropWhileC (/= '[')
     dropC 1
 
 
-processObject :: Monad m => [Op] -> ConduitM Char Char m ()
+processObject :: Monad m => [Op] -> CharConduit m
 processObject ops = do
     -- consume object start
     dropWhileC (== '{')
@@ -48,7 +50,7 @@ processObject ops = do
     dropWhileC (== '}')
     yield '}'   
 
-processField :: Monad m => [Op] -> ConduitM Char Char m ()
+processField :: Monad m => [Op] -> CharConduit m
 processField ops =  do
     fieldName <- getFieldName
     if all (\x -> case x of
@@ -62,7 +64,7 @@ processField ops =  do
                 -- keep droping field
                 {dropField; nextField False}
     where
-        nextField :: Monad m => Bool -> ConduitM Char Char m ()
+        nextField :: Monad m => Bool -> CharConduit m
         nextField persisted = do         
             val <- peekC
             case val of 
@@ -80,17 +82,36 @@ getFieldName = do
     dropWhileC (\x -> x =='\"' || x == ':' || x == ' ')   
     return y
         
-getFieldValue :: Monad m => ConduitM Char Char m ()
+getFieldValue :: Monad m => CharConduit m
 getFieldValue = do
     val <- takeWhileC (\x -> x /= ',' && x /= '}') .| sinkList
     dropWhileC (\x -> x == ',' || x == '}')
     yieldMany val
 
-dropField :: Monad m => ConduitM Char Char m ()
-dropField = do
-    dropWhileC (/=',')
-    dropC 1
-    -- dropWhileC (\x -> x == ' ' || (x /= '{' && x /= '[' && x /= ',' && x /= '}')) 
+--"{\"b\":{\"name\":Jan, \"surname\": {\"v\":Kowalski}}, \"c\": c}"
+dropField :: Monad m => CharConduit m
+dropField = do    
+    dropWhileC (\x ->x /= '{' && x /= '[' && x /= ',' && x /= '}') 
+    val <- takeC 1 .| sinkList
+    case val of
+        "{" -> keepDropping '}'
+        "[" -> keepDropping ']'
+        -- done dropping
+        "," -> return ()
+        "}" -> return ()
+    where
+        keepDropping :: Monad m => Char -> CharConduit m
+        keepDropping v = do
+            dropTillFound
+            val <- takeC 1 .| sinkList
+            case val of
+                "{" -> do {keepDropping '}'; dropTillFound;}
+                "[" -> do {keepDropping ']'; dropTillFound;}
+                v -> return ()
+            where 
+                dropTillFound :: Monad m => CharConduit m
+                dropTillFound = dropWhileC (\x -> not $ elem x (v:"{[") )
+
 
 
     
