@@ -6,21 +6,22 @@ import TransformsParser
 import ConduitReader
 import Conduit
 import Control.Monad
+import Data.Conduit.Text
 import Flow
 
 
-testString :: String
-testString = "{\"a\":a,\"b\":b, \"c\": c, \"d\":d, \"e\": e}"
-
 args :: IO [String]
-args = return ["del .a,", "del .b,", "del .d"]
+args = return ["del .a"]
 
 
 main = 
     args 
     >>= processArgs 
     >>= (\ops->
-     runConduit $ yieldMany testString 
+    runConduitRes $ sourceFile "test.txt" 
+    .| decodeUtf8C 
+    .| Data.Conduit.Text.lines
+    .| linesToChars  
     .| processUnknownStart ops
     .| sinkList
     )

@@ -2,6 +2,8 @@ module ConduitReader where
 
 import Conduit
 import Operations
+import Data.Text
+import Debug.Trace
 
 -- disperse :: Monad m => ConduitM Text Char m ()
 -- disperse = do
@@ -10,6 +12,15 @@ import Operations
 -- run = runConduit $ yieldMany testString .| processUknownStart .| sinkList
 
 type CharConduit m = ConduitM Char Char m ()
+
+linesToChars :: Monad m => ConduitM Text Char m ()
+linesToChars = do
+    val <- await
+    case val of 
+        Just x -> do {yieldMany $ unpack x; linesToChars;}
+        Nothing -> return (); 
+
+
 
 processUnknownStart :: Monad m => [Op] -> CharConduit m
 processUnknownStart ops = do
@@ -29,7 +40,7 @@ processUnknownValue ops = do
     val <- peekC 
     case val of
         Nothing -> return ()
-        Just '{' -> processObject ops
+        Just '{' -> processObject ops 
         Just '[' -> processArray
         Just ' ' -> do { takeWhileC (==' '); processUnknownValue ops}
         Just x -> getFieldValue
@@ -53,7 +64,7 @@ processObject ops = do
 processField :: Monad m => [Op] -> CharConduit m
 processField ops =  do
     fieldName <- getFieldName
-    if all (\x -> case x of
+    if Prelude.all (\x -> case x of
                 -- check if field needs to be removed
                 Removal [name] -> name /= fieldName 
                 _ -> True
@@ -62,7 +73,7 @@ processField ops =  do
                 { yieldMany fieldName; yield ':'; processUnknownValue ops; nextField True;} 
                 else do
                 -- keep droping field
-                {dropField; nextField False}
+                {dropField []; nextField False}
     where
         nextField :: Monad m => Bool -> CharConduit m
         nextField persisted = do         
@@ -88,30 +99,26 @@ getFieldValue = do
     dropWhileC (\x -> x == ',' || x == '}')
     yieldMany val
 
---"{\"b\":{\"name\":Jan, \"surname\": {\"v\":Kowalski}}, \"c\": c}"
-dropField :: Monad m => CharConduit m
-dropField = do    
-    dropWhileC (\x ->x /= '{' && x /= '[' && x /= ',' && x /= '}') 
+ --   {"a": {"v": {"g":g}}, "b":b}
+dropField :: Monad m => [Char] -> CharConduit m
+
+dropField [] = do
+    dropWhileC (\x -> not $ elem x "{[,}]")
     val <- takeC 1 .| sinkList
     case val of
-        "{" -> keepDropping '}'
-        "[" -> keepDropping ']'
-        -- done dropping
-        "," -> return ()
-        "}" -> return ()
-    where
-        keepDropping :: Monad m => Char -> CharConduit m
-        keepDropping v = do
-            dropTillFound
-            val <- takeC 1 .| sinkList
-            case val of
-                "{" -> do {keepDropping '}'; dropTillFound;}
-                "[" -> do {keepDropping ']'; dropTillFound;}
-                v -> return ()
-            where 
-                dropTillFound :: Monad m => CharConduit m
-                dropTillFound = dropWhileC (\x -> not $ elem x (v:"{[") )
+        "{" -> dropField $ trace "pushing { onto the stack" "{"
+        "," -> return $ trace "found comma" ()
+        "[" -> dropField "["
 
+dropField stack = do
+    dropWhileC (\x -> not $ elem x "{[,}]")
+    val <- takeC 1 .| sinkList
+    case val of
+        "{" -> dropField $ trace "pushing { onto the stack" ('{':stack)
+        "[" -> dropField ('[':stack)
+        "}" -> dropField $ Prelude.tail $ trace "taking } from the stack" stack
+        "]" -> dropField $ Prelude.tail stack
+        x -> dropField $ trace ("found" ++ show x) stack
 
 
     
