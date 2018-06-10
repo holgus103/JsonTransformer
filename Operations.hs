@@ -7,8 +7,10 @@ module Operations where
 -- remove : del .[].message
 
 data Op = Filtering [String]
-        |  Assignment [String] String
-        |  Appending [String] String
+        |  AssignmentD [String] String
+        |  AssignmentR [String] String
+        |  AppendingD [String] String
+        |  AppendingR [String] String
         |  Removal [String]
         | None deriving (Show)
 

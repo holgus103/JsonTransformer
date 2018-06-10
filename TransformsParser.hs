@@ -22,7 +22,7 @@ processArgs args =
 parseOperation :: String -> Op
 parseOperation s = 
     Prelude.dropWhile (==' ') s
-    |> (\i -> parseFilter i <|> parseRemove i)
+    |> (\i -> parseFilter i <|> parseRemove i <|> parseAssignment i)
     |> (\x -> case x of 
             Just v -> v
             Nothing -> None
@@ -43,6 +43,35 @@ parseFilter (x:xs) =
     case x of
         '.' -> processField Filtering xs "" []
         _ -> Nothing
+
+parseAssignment :: String -> Maybe Op
+parseAssignment (x:xs) = 
+    case x of 
+        '.' -> fields xs "" []
+        _ -> Nothing
+    where 
+        fields :: String -> String -> [String] -> Maybe Op
+        fields (y:ys) f acc =
+            case y of
+                '.' -> reverse f 
+                        |> (:acc)
+                        |> fields ys ""
+                '=' -> parseType ys ((reverse f):acc) AssignmentD AssignmentR
+                '+' -> parseType ys ((reverse f):acc) AppendingD AppendingR
+                x -> fields ys (y:f) acc
+        
+        parseType :: String -> [String] -> 
+            ([String] -> String -> Op) ->
+            ([String] -> String -> Op) -> 
+            Maybe Op
+        parseType (y:ys) acc d r = 
+            case y of
+                -- direct assignment 
+                '\"' -> Just $ d (reverse acc) ('\"':ys) 
+                -- relative assignment
+                x -> Just $ r (reverse acc) $ (x:) $ takeWhile (/=' ') ys 
+
+                
 
 parseRemove :: String -> Maybe Op
 parseRemove s =
