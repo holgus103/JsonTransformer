@@ -1,12 +1,15 @@
 module Helpers where 
 
 
-import Operations
+import Enums
 import Conduit
 import Debug.Trace
 import Flow
 
 type CharConduit m = ConduitM Char Char m ()
+
+type ContainerConduit m = ConduitM Char Char m ConduitResult
+
 
 -- check ops for a matching removal token
 notRemovable :: [Char] -> [Op] -> Bool
@@ -39,6 +42,7 @@ dropField [] = do
         "{" -> dropField $ trace "pushing { onto the stack" "{"
         "," -> return $ trace "found end" ()
         "[" -> dropField "["
+        "}" -> return ()
 
 dropField stack = do
     dropWhileC (\x -> not $ elem x "{[,}]")

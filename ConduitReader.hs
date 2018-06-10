@@ -1,12 +1,12 @@
 module ConduitReader where 
 
 import Conduit
-import Operations
+import Enums
 import Data.Text
 import Debug.Trace
 import Flow
 import Helpers
-
+import Control.Monad
 
 linesToChars :: Monad m => ConduitM Text Char m ()
 linesToChars = do
@@ -22,62 +22,72 @@ processUnknownStart ops = do
     case val of 
         Nothing -> return ()
         -- if object beginning detected call processObject
-        Just '{' -> processObject ops "{"
+        Just '{' -> void $ processObject ops ""
         -- if array beginning detected call processArray
-        Just '[' -> processArray
+        Just '[' -> void $ processArray
         -- if none of the above keep dropping chars 
-        Just x ->  do {takeWhileC (\x -> x /= '[' && x /= '{'); processUnknownStart ops}
+        Just x ->  do {takeWhileC (\x -> x /= '[' && x /= '{'); void $ processUnknownStart ops}
 
-processUnknownValue :: Monad m => [Op] -> [Char] -> CharConduit m
+processUnknownValue :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processUnknownValue ops buf = do
     val <- peekC 
     case val of
-        Nothing -> return ()
+        Nothing -> return Empty
         Just '{' -> processObject ops buf
         Just '[' -> processArray
         Just ' ' -> do { takeWhileC (==' '); processUnknownValue ops buf}
-        Just x -> do {yieldMany buf; processFieldValue;}
+        Just x -> do {yieldMany buf; processFieldValue; return NonEmpty}
 
-processArray :: Monad m => CharConduit m
+processArray :: Monad m => ContainerConduit m
 processArray = do
     dropWhileC (/= '[')
     dropC 1
+    return Empty
 
 
-processObject :: Monad m => [Op] -> [Char] -> CharConduit m
+processObject :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processObject ops buf = do
     -- consume object start
     dropWhileC (== '{')
-    processField ops (buf ++ "{")
+    res <- processField ops (buf ++ "{") $ trace "consumed { of object" Empty
     -- consume object end
-    dropWhileC (== '}')
-    yield '}'   
+    case res of
+        Empty -> return $ trace "object got empty" Empty
+        -- if the buffered values were flushed - the object is not empty
+        NonEmpty -> do {yield '}'; return $ trace "object got nonempty" NonEmpty;}
 
 
 
-processField :: Monad m => [Op] -> [Char] -> CharConduit m
-processField ops buf =  do
-    fieldName <- getFieldName
-    -- check if field is to be removed
-    if notRemovable fieldName ops then do 
-        -- write field to output with it's value
-        yieldMany buf
-        yieldMany fieldName; yield ':'
-        processUnknownValue (subrules fieldName ops) buf
-        nextField True
-    else do
-        -- keep droping field
-        dropField []
-        nextField False
-    where
-
-        nextField :: Monad m => Bool -> CharConduit m
-        nextField persisted = do         
-            val <- peekC
-            case val of 
-                Nothing -> return ()
-                Just x -> if x == '}' then return ()
-                        else do {if persisted then  yield ',' else return (); processField ops buf} 
+processField :: Monad m => [Op] -> [Char] -> ConduitResult -> ContainerConduit m
+processField ops buf res = do     
+    val <- peekC 
+    case val of     
+        Nothing -> return res
+        Just x -> 
+            -- object end found, flush and return if level is empty
+            if x == '}' then do
+                yieldMany buf
+                return res
+            else do
+                fieldName <- getFieldName
+                -- check if field is to be removed
+                if notRemovable fieldName ops then do 
+                    case res of
+                        -- nothing has been flushed before
+                        Empty -> do
+                            val <- processUnknownValue (subrules fieldName ops) (buf ++ fieldName ++ ":")
+                            case val of
+                                Empty -> processField ops buf Empty
+                                NonEmpty -> processField ops "" NonEmpty
+                        -- non empty 
+                        NonEmpty -> do
+                            yieldMany buf
+                            processUnknownValue (subrules fieldName ops) (',':fieldName ++ ":")
+                            processField ops "" NonEmpty
+                else do
+                    -- drop field
+                    dropField $ trace ("dropping field " ++ fieldName ++ " buffer: " ++ buf) []
+                    processField ops buf res
 
 getFieldName :: Monad m => ConduitM Char o m [Char]
 getFieldName = do

@@ -1,7 +1,7 @@
 module TransformsParser where 
 
 import System.Environment
-import Operations  
+import Enums  
 import Flow  
 import Data.List.Split
 import Control.Applicative
@@ -28,9 +28,6 @@ parseOperation s =
             Nothing -> None
         )
 
--- [].asd
--- .asd
--- .asd[].asd
 ensureDot :: String -> Maybe String
 ensureDot (x:xs) = 
     case x of
