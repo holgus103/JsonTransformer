@@ -40,9 +40,9 @@ dropField [] = do
     val <- takeC 1 .| sinkList
     case val of
         "{" -> dropField $ trace "pushing { onto the stack" "{"
-        "," -> return $ trace "found end" ()
+        "," -> (trace "found end" return) ()
         "[" -> dropField "["
-        "}" -> return ()
+        "}" -> do {leftover '}'; return ();}
 
 dropField stack = do
     dropWhileC (\x -> not $ elem x "{[,}]")

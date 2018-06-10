@@ -18,6 +18,7 @@ linesToChars = do
 processUnknownStart :: Monad m => [Op] -> CharConduit m
 processUnknownStart ops = do
     -- check first character
+    dropWhileC (==' ')
     val <- peekC 
     case val of 
         Nothing -> return ()
@@ -48,8 +49,8 @@ processArray = do
 processObject :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processObject ops buf = do
     -- consume object start
-    dropWhileC (== '{')
-    res <- processField ops (buf ++ "{") $ trace "consumed { of object" Empty
+    dropWhileC (== (trace "processing object" '{'))
+    res <- processField ops (buf ++ "{") Empty
     -- consume object end
     case res of
         Empty -> return $ trace "object got empty" Empty
@@ -60,16 +61,19 @@ processObject ops buf = do
 
 processField :: Monad m => [Op] -> [Char] -> ConduitResult -> ContainerConduit m
 processField ops buf res = do     
-    val <- peekC 
-    case val of     
-        Nothing -> return res
-        Just x -> 
+    dropWhileC (==' ')
+    val <- takeC 1 .| sinkList 
+    case trace (show val) val of     
+        "" -> (trace ("returning with " ++ buf) return) res
+        x -> 
             -- object end found, flush and return if level is empty
-            if x == '}' then do
-                yieldMany buf
-                return res
+            if (trace ("x:" ++  x) x) == "}" then do
+                case res of 
+                    Empty -> return res;
+                    NonEmpty -> do {yieldMany buf; return res}
             else do
                 fieldName <- getFieldName
+                d <- (trace ("processing field " ++ fieldName) (return 1) )
                 -- check if field is to be removed
                 if notRemovable fieldName ops then do 
                     case res of
@@ -103,7 +107,8 @@ getFieldName = do
 processFieldValue :: Monad m => CharConduit m
 processFieldValue = do
     val <- takeWhileC (\x -> x /= ',' && x /= '}') .| sinkList
-    dropWhileC (\x -> x == ',' || x == '}')
+    d <- trace ("field value: " ++ val) (return 1)
+    dropWhileC (\x -> x == ',')
     yieldMany val
 
     
