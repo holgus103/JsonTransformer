@@ -13,18 +13,20 @@ import Flow
 args :: IO [String]
 args = return ["add .[].b=\"11\""]
 
-
+main :: IO ()
 main = 
     args 
     >>= processArgs 
     >>= (\ops->
-    runConduitRes $ sourceFile "test.txt" 
+     runConduitRes $ sourceFile "test.txt" 
     .| decodeUtf8C 
     .| Data.Conduit.Text.lines
     .| linesToChars  
     .| processUnknownStart ops
     .| sinkList
     )
+    >>= (\x -> putStrLn $ show x)
+    >> return ()
     
 
 
