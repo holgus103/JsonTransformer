@@ -49,7 +49,7 @@ processArray :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processArray ops buf = 
     dropWhileC (/= '[')
     >> dropC 1
-    >> processArrayElement ops "[" 0 Empty
+    >> processArrayElement ops (buf ++ "[") 0 Empty
     >>= (\res -> 
         case res of 
             Empty -> return Empty
@@ -159,7 +159,7 @@ getFieldName =
 -- simply flushes a field
 processFieldValue :: Monad m => CharConduit m
 processFieldValue = 
-    takeWhileC (\x -> x /= ',' && x /= '}') .| sinkList
+    takeWhileC (\x -> x /= ',' && x /= '}' && x /= ']') .| sinkList
     -- d <- trace ("field value: " ++ val) (return 1)
     >>= (\val -> dropWhileC (\x -> x == ',') >> yieldMany val)
 
@@ -175,8 +175,8 @@ processArrayElement ops buf index res =
             Nothing -> return Empty
             -- found array end
             Just ']' -> case res of
-                Empty -> return Empty
-                NonEmpty -> yieldMany buf >> return NonEmpty
+                Empty -> dropC 1 >> return Empty
+                NonEmpty -> dropC 1 >> yieldMany buf >> return NonEmpty
             x ->
                 case arrayAction index ops of
                 Just (Removal _) -> 

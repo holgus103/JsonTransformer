@@ -11,7 +11,7 @@ import Flow
 
 
 args :: IO [String]
-args = return ["del .[0].a"]
+args = return ["add .[].b=\"11\""]
 
 
 main = 

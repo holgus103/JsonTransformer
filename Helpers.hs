@@ -87,6 +87,7 @@ subrulesArray index ops =
         AddD (h:h2:t) _ -> appliesToIndex h index
         AssignmentR (h:h2:t) _ -> appliesToIndex h index
         AddR (h:h2:t) _ -> appliesToIndex h index
+        v -> False
     ) ops
     |> reduceRuleLevel
 
