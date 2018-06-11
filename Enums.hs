@@ -9,8 +9,8 @@ module Enums where
 data Op = Filtering [String]
         |  AssignmentD [String] String
         |  AssignmentR [String] String
-        |  AppendingD [String] String
-        |  AppendingR [String] String
+        |  AddD [String] String
+        |  AddR [String] String
         |  Removal [String]
         | None deriving (Show)
 

@@ -7,6 +7,7 @@ import Debug.Trace
 import Flow
 import Helpers
 import Control.Monad
+import Data.List
 
 linesToChars :: Monad m => ConduitM Text Char m ()
 linesToChars = do
@@ -50,14 +51,33 @@ processObject :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processObject ops buf = do
     -- consume object start
     dropWhileC (== (trace "processing object" '{'))
-    res <- processField ops (buf ++ "{") Empty
-    -- consume object end
-    case res of
-        Empty -> return $ trace "object got empty" Empty
-        -- if the buffered values were flushed - the object is not empty
-        NonEmpty -> do {yield '}'; return $ trace "object got nonempty" NonEmpty;}
+    let additions = getDirectAdditions ops
+    case additions of
+        -- no additons
+        [] -> do 
+            res <- processField ops (buf ++ "{") Empty
+            -- consume object end
+            case res of
+                Empty -> return $ trace "object got empty" Empty
+                -- if the buffered values were flushed - the object is not empty
+                NonEmpty -> do {yield '}'; return $ trace "object got nonempty" NonEmpty;}
+        -- some additions were done
+        _  -> do 
+            yieldMany (buf ++ "{");
+            flushAdditions additions;
+            processField ops "" NonEmpty
+            yield '}'
+            return NonEmpty 
 
 
+flushAdditions :: Monad m => [Op] -> ContainerConduit m
+flushAdditions ops = 
+    case ops of
+        [] -> return Empty
+        _ -> Data.List.map (\(AddD [name] val) -> (name ++ ":" ++ val)) ops
+            |> Data.List.intersperse "," 
+            |> Data.List.map (\x -> do {yieldMany x; return NonEmpty})
+            |> Data.List.head
 
 processField :: Monad m => [Op] -> [Char] -> ConduitResult -> ContainerConduit m
 processField ops buf res = do     

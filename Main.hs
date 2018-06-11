@@ -11,7 +11,7 @@ import Flow
 
 
 args :: IO [String]
-args = return [".a.1.y=\"test1\",", ".a.2=\"test2\""]
+args = return ["add .a.3=\"value\""]
 
 
 main = 

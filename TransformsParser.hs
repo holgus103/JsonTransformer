@@ -22,7 +22,7 @@ processArgs args =
 parseOperation :: String -> Op
 parseOperation s = 
     Prelude.dropWhile (==' ') s
-    |> (\i -> parseFilter i <|> parseRemove i <|> parseAssignment i)
+    |> (\i -> parseFilter i <|> parseRemove i <|> parseAdd i <|> parseAssignment i)
     |> (\x -> case x of 
             Just v -> v
             Nothing -> None
@@ -41,34 +41,48 @@ parseFilter (x:xs) =
         '.' -> processField Filtering xs "" []
         _ -> Nothing
 
+
+parseAdd :: String -> Maybe Op
+parseAdd s = 
+    if isPrefixOf "add" s then 
+        drop 3 s
+        |> dropWhile (==' ')
+        |> (\(x:xs) -> 
+            case x of
+                '.' -> fields xs "" [] AddD AddR
+                _ -> Nothing
+        )
+    else Nothing
+
+
 parseAssignment :: String -> Maybe Op
 parseAssignment (x:xs) = 
     case x of 
-        '.' -> fields xs "" []
+        '.' -> fields xs "" [] AssignmentD AssignmentR
         _ -> Nothing
-    where 
-        fields :: String -> String -> [String] -> Maybe Op
-        fields (y:ys) f acc =
-            case y of
-                '.' -> reverse f 
-                        |> (:acc)
-                        |> fields ys ""
-                '=' -> parseType ys ((reverse f):acc) AssignmentD AssignmentR
-                '+' -> parseType ys ((reverse f):acc) AppendingD AppendingR
-                x -> fields ys (y:f) acc
-        
-        parseType :: String -> [String] -> 
-            ([String] -> String -> Op) ->
-            ([String] -> String -> Op) -> 
-            Maybe Op
-        parseType (y:ys) acc d r = 
-            case y of
-                -- direct assignment 
-                '\"' -> Just $ d (reverse acc) ('\"':ys) 
-                -- relative assignment
-                x -> Just $ r (reverse acc) $ (x:) $ takeWhile (/=' ') ys 
 
-                
+parseType :: String -> [String] -> 
+    ([String] -> String -> Op) ->
+    ([String] -> String -> Op) -> 
+    Maybe Op
+parseType (y:ys) acc d r = 
+    case y of
+        -- direct assignment 
+        '\"' -> Just $ d (reverse acc) ('\"':ys) 
+        -- relative assignment
+        x -> Just $ r (reverse acc) $ (x:) $ takeWhile (/=' ') ys 
+
+fields :: String -> String -> [String] -> 
+    ([String] -> String -> Op) ->
+    ([String] -> String -> Op) -> 
+    Maybe Op
+fields (y:ys) f acc d r =
+    case y of
+        '.' -> reverse f 
+                |> (:acc)
+                |> (\x -> fields ys "" x d r)
+        '=' -> parseType ys ((reverse f):acc) d r
+        x -> fields ys (y:f) acc d r             
 
 parseRemove :: String -> Maybe Op
 parseRemove s =

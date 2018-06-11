@@ -28,17 +28,27 @@ assignableDirectly name ops =
         _ -> False 
     ) ops
 
+getDirectAdditions :: [Op] -> [Op]
+getDirectAdditions ops =
+    filter (\x -> case x of
+        AddD [f] _ -> True
+        _ -> False
+    ) ops
+
+
 -- filters rules for a field 
 subrules :: [Char] -> [Op] -> [Op]
 subrules name ops = 
     Prelude.filter (\x-> case x of
             Removal (h:h2:t) -> h == name
             AssignmentD (h:h2:t) _ -> h == name 
+            AddD (h:h2:t) _ -> h == name
             _ -> False 
         ) ops   
     |> Prelude.map (\x -> case x of 
             Removal (h:t) -> Removal t
             AssignmentD (h:t) v -> AssignmentD t v
+            AddD (h:t) v -> AddD t v
             v -> v
         ) 
 
