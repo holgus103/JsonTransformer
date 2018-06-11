@@ -11,7 +11,7 @@ import Flow
 
 
 args :: IO [String]
-args = return ["del .a.1.y,", "del .a.1.v,", "del .a.2,", "del .b"]
+args = return [".a.1.y=\"test1\",", ".a.2=\"test2\""]
 
 
 main = 

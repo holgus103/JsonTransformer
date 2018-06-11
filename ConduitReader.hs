@@ -73,25 +73,38 @@ processField ops buf res = do
                     NonEmpty -> do {yieldMany buf; return res}
             else do
                 fieldName <- getFieldName
-                d <- (trace ("processing field " ++ fieldName) (return 1) )
+                d <- (trace ("processing field " ++ fieldName ++ " " ++ (show $ fieldAction fieldName ops) ++ " ops:" ++ (show ops) ) (return 1) )
+            
                 -- check if field is to be removed
-                if notRemovable fieldName ops then do 
-                    case res of
-                        -- nothing has been flushed before
-                        Empty -> do
-                            val <- processUnknownValue (subrules fieldName ops) (buf ++ fieldName ++ ":")
-                            case val of
-                                Empty -> processField ops buf Empty
-                                NonEmpty -> processField ops "" NonEmpty
-                        -- non empty 
-                        NonEmpty -> do
-                            yieldMany buf
-                            processUnknownValue (subrules fieldName ops) (',':fieldName ++ ":")
-                            processField ops "" NonEmpty
-                else do
-                    -- drop field
-                    dropField $ trace ("dropping field " ++ fieldName ++ " buffer: " ++ buf) []
-                    processField ops buf res
+                case fieldAction fieldName ops of
+                    Just (Removal _) -> do
+                        -- drop field
+                        dropField $ trace ("dropping field " ++ fieldName ++ " buffer: " ++ buf) []
+                        processField ops buf res
+                    Just (AssignmentD _ val) -> do
+                        dropField []
+                        d <- trace ("assignment buffer " ++ buf) (return 1)
+                        yieldMany buf
+                        case res of
+                            NonEmpty -> yieldMany ("," ++ fieldName ++ ":" ++ val)
+                            Empty -> yieldMany (fieldName ++ ":" ++ val)
+                        processField ops "" NonEmpty
+
+                    _ -> do
+                        case res of
+                            -- nothing has been flushed before
+                            Empty -> do
+                                val <- processUnknownValue (subrules fieldName ops) (buf ++ fieldName ++ ":")
+                                case val of
+                                    Empty -> processField ops buf Empty
+                                    NonEmpty -> processField ops "" NonEmpty
+                            -- non empty 
+                            NonEmpty -> do
+                                yieldMany buf
+                                processUnknownValue (subrules fieldName ops) (',':fieldName ++ ":")
+                                processField ops "" NonEmpty
+
+
 
 getFieldName :: Monad m => ConduitM Char o m [Char]
 getFieldName = do
@@ -107,7 +120,7 @@ getFieldName = do
 processFieldValue :: Monad m => CharConduit m
 processFieldValue = do
     val <- takeWhileC (\x -> x /= ',' && x /= '}') .| sinkList
-    d <- trace ("field value: " ++ val) (return 1)
+    -- d <- trace ("field value: " ++ val) (return 1)
     dropWhileC (\x -> x == ',')
     yieldMany val
 
