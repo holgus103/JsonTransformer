@@ -95,7 +95,7 @@ flushAdditions :: Monad m => [Op] -> ContainerConduit m
 flushAdditions ops = 
     case ops of
         [] -> return Empty
-        _ -> Data.List.map (\(AddD [name] val) -> (name ++ ":" ++ val)) ops
+        _ -> Data.List.map (\(AddD [name] val) -> ("\"" ++ name ++ "\":" ++ val)) ops
             |> Data.List.intersperse "," 
             |> Data.List.map (\x -> yieldMany x >> return NonEmpty)
             |> Data.List.head
@@ -128,7 +128,7 @@ processField ops buf res = do
                         >> yieldMany buf
                         >> case res of
                                 NonEmpty -> yieldMany (",\"" ++ fieldName ++ "\":" ++ val)
-                                Empty -> yieldMany (fieldName ++ ":" ++ val)
+                                Empty -> yieldMany ("\"" ++ fieldName ++ "\":" ++ val)
                         >> processField ops "" NonEmpty
                     Just FieldSrc -> 
                         -- trace "loading field" (return 1) >>

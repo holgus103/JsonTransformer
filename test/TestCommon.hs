@@ -17,4 +17,7 @@ performParsingTest args input output = TestCase
     .| processUnknownStart ops
     .| sinkList
     ) 
-    >>= assertEqual "deleteFromArray" output) 
+    >>= assertEqual "Test failed" output)
+
+testValue :: String
+testValue = "[{\"a\": 1, \"b\": \"bvalue\"}, {\"a\": 1, \"b\": 111}, {\"a\": \"asd\", \"b\": \"bvalue\"}]" 

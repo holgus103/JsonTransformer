@@ -44,13 +44,13 @@ deleteForEvery :: Test
 deleteForEvery =
     performParsingTest 
         ["del .[].a"] 
-        "[{\"a\": 1, \"b\": \"bvalue\"}, {\"a\": 1, \"c\": 111}, {\"a\": \"asd\", \"b\": \"bvalue\"}]" 
-        "[{\"b\":\"bvalue\"},{\"c\":111},{\"b\":\"bvalue\"}]"
+        testValue 
+        "[{\"b\":\"bvalue\"},{\"b\":111},{\"b\":\"bvalue\"}]"
 
 deleteForEveryWhole :: Test 
 deleteForEveryWhole =
     performParsingTest 
         ["del .[].a, del .[].b"] 
-        "[{\"a\": 1, \"b\": \"bvalue\"}, {\"a\": 1, \"b\": 111}, {\"a\": \"asd\", \"b\": \"bvalue\"}]" 
+        testValue 
         ""
 

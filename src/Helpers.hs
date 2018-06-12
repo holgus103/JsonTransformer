@@ -149,11 +149,11 @@ dropField stack =
     dropWhileC (\x -> not $ elem x "{[,}]")
     >> takeC 1 .| sinkList
     >>= (\val -> case val of
-            "{" -> dropField $ trace "pushing { onto the stack" ('{':stack)
+            "{" -> dropField ('{':stack)
             "[" -> dropField ('[':stack)
-            "}" -> dropField $ Prelude.tail $ trace "taking } from the stack" stack
+            "}" -> dropField $ Prelude.tail stack
             "]" -> dropField $ Prelude.tail stack
-            x -> dropField $ trace ("found" ++ show x) stack
+            x -> dropField stack
     )
 
 takeField :: Monad m => String -> String -> ConduitM Char Char m [Char] 

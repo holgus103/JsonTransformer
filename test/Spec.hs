@@ -1,5 +1,8 @@
 import Test.HUnit
+
 import DeletionTests
+import AdditionTests
+import AssignmentTests
 import Control.Monad
 
 
@@ -14,7 +17,14 @@ tests = TestList [
     TestLabel "deleteForEveryWhole" deleteForEveryWhole,
     TestLabel "deleteWholeRecursive" deleteWholeRecursive,
     TestLabel "deleteForEvery" deleteForEvery,
-    TestLabel "deleteFromObjectNoQuotations" deleteFromObjectNoQuotations
+    TestLabel "deleteFromObjectNoQuotations" deleteFromObjectNoQuotations,
+    TestLabel "addFieldNested" addFieldNested,
+    TestLabel "addFieldNestedObj" addFieldNestedObj,
+    TestLabel "addFieldForEvery" addFieldForEvery,
+    TestLabel "assignFieldNested" assignFieldNested,
+    TestLabel "assignFieldNestedObj" assignFieldNestedObj,
+    TestLabel "assignFieldForEvery" assignFieldForEvery,
+    TestLabel "assignArray" assignArray
     ]
 
 main :: IO ()
