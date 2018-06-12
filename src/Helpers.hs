@@ -120,7 +120,9 @@ fieldAction name ops =
 
 arrayAction :: Int -> [Op] -> Maybe Action
 arrayAction index ops =
-    removableArray index ops <|> assignableDirectlyArray index ops
+    removableArray index ops <|> relativeSource name ops <|> assignableDirectlyArray index ops
+    where 
+        name = "[" ++ (show index) ++  "]"
     
 
 -- drops an entire field 
