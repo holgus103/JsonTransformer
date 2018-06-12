@@ -24,7 +24,11 @@ tests = TestList [
     TestLabel "assignFieldNested" assignFieldNested,
     TestLabel "assignFieldNestedObj" assignFieldNestedObj,
     TestLabel "assignFieldForEvery" assignFieldForEvery,
-    TestLabel "assignArray" assignArray
+    TestLabel "assignArray" assignArray,
+    TestLabel "arrayAssignmentRelative" arrayAssignmentRelative,
+    TestLabel "relativeAdd" relativeAdd,
+    TestLabel "arrayAddition" arrayAddition,
+    TestLabel "arrayAdditionRelative" arrayAdditionRelative
     ]
 
 main :: IO ()

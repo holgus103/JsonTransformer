@@ -3,7 +3,7 @@ module ConduitReader where
 import Conduit
 import Enums
 import Data.Text
--- import Debug.Trace
+-- import Debug.Trace  
 import Flow
 import Helpers
 import Control.Monad
@@ -68,39 +68,32 @@ processObject ops buf =
     dropWhileC (== '{')
     -- >> trace "processing object" (return 1)
     -- let relatives = getRelativeOps ops
-    >> case additions of
-        -- no additons
-        [] -> 
-            processField ops (buf ++ "{") Empty
-            -- consume object end
-            >>= (\res -> case res of
-                Empty -> 
-                    -- trace "object got empty" (return 1) >>
-                    return Empty
-                -- if the buffered values were flushed - the object is not empty
-                NonEmpty -> 
-                    yield '}' 
-                    -- >> yield '!'
-                    -- >> trace "object got nonempty" (return 1)
-                    >> return NonEmpty
-                )
-        -- some additions were done
-        _  -> 
-            yieldMany (buf ++ "{")
-            >> flushAdditions additions
-            >> processField ops "" NonEmpty
-            >> yield '}'
+    >> processField ops (buf ++ "{") Empty
+    -- consume object end
+    >>= (\res -> case res of
+        Empty -> 
+            -- trace "object got empty" (return 1) >>
+            return Empty
+        -- if the buffered values were flushed - the object is not empty
+        NonEmpty -> 
+            yield '}' 
+            -- >> yield '!'
+            -- >> trace "object got nonempty" (return 1)
             >> return NonEmpty
-        where 
-            additions = getDirectAdditions ops
+        )
 
--- | Executes direct assignments for an object and adds them in the beginning of it.
-flushAdditions :: Monad m => [Op] -> ContainerConduit m
-flushAdditions ops = 
+
+-- | Executes direct assignments for an object and adds them at the end of it.
+flushAdditions :: Monad m => ConduitResult -> [Op] -> ContainerConduit m
+flushAdditions res ops = 
     case ops of
-        [] -> return Empty
-        _ -> Data.List.map (\(AddD [name] val) -> ("\"" ++ name ++ "\":" ++ val)) ops
-            |> Data.List.intersperse "," 
+        [] -> return res
+        _  -> case res of
+                Empty -> 
+                    Data.List.map (\(AddD [name] val) -> ("\"" ++ name ++ "\":" ++ val)) ops
+                        |> Data.List.intersperse "," 
+                NonEmpty ->
+                    Data.List.map (\(AddD [name] val) -> (",\"" ++ name ++ "\":" ++ val)) ops
             |> Data.List.map (\x -> yieldMany x >> return NonEmpty)
             |> Data.List.head
 
@@ -110,13 +103,18 @@ processField ops buf res = do
     dropWhileC (==' ')
     val <- takeC 1 .| sinkList 
     case val of     
-        -- "" -> (trace ("returning with " ++ buf) (return 1) >> return res
+        "" ->
+            -- (trace ("returning with " ++ buf) (return 1) >> 
+            return res
         x -> 
             -- object end found, flush and return if level is empty
             if x == "}" then
-                case res of 
-                    Empty -> return res;
-                    NonEmpty -> yieldMany buf >> return res
+                -- trace (show ops) (return 1)>>
+                (getDirectAdditions ops |> flushAdditions res)
+                >>= (\r -> case r of 
+                    Empty -> return r;
+                    NonEmpty -> yieldMany buf >> return r
+                )
             else do
                 fieldName <- getFieldName
                 -- d <- (trace ("processing field " ++ fieldName ++ " " ++ (show $ fieldAction fieldName ops) ++ " ops:" ++ (show ops) ) (return 1) )
@@ -142,7 +140,7 @@ processField ops buf res = do
                             case res of
                                 Empty -> yieldMany (buf ++ "\"" ++ fieldName ++ "\":" ++ val) 
                                 NonEmpty -> yieldMany (buf ++ ",\"" ++ fieldName ++ "\":" ++ val)
-                            >> processField (convertRelativeAssignment fieldName val ops) "" NonEmpty
+                            >> processField (convertRelatives fieldName val ops) "" NonEmpty
                         )
                     _ -> 
                         case res of
@@ -178,7 +176,8 @@ processFieldValue =
 
 -- | Processes all array elements one by one, similar to processField.        
 processArrayElement :: Monad m => [Op] -> [Char] -> Int -> ConduitResult -> ContainerConduit m
-processArrayElement ops buf index res = 
+processArrayElement ops buf index res =
+    -- add fields  
     dropWhileC (\x -> elem x ", " )
     -- >> trace ("processing index: " ++ (show index) ++ " buf:" ++ buf) (return 1)
     >> peekC
@@ -192,44 +191,51 @@ processArrayElement ops buf index res =
                 NonEmpty -> dropC 1 >> yieldMany buf >> return NonEmpty
             x ->
                 case arrayAction index ops of
-                Just FieldRemove -> 
-                    dropField  []
-                    >> processArrayElement ops buf (index + 1) res
-                Just (FieldAssignD val) -> 
-                    dropField []
-                    -- d <- trace ("assignment buffer " ++ buf) (return 1)
-                    >> yieldMany buf
-                    >> case res of
-                            NonEmpty -> yieldMany ("," ++ val)
-                            Empty -> yieldMany (val)
-                    >> processArrayElement ops "" (index + 1) NonEmpty
-                Just FieldSrc -> 
-                    -- trace "loading field" (return 1) >>
-                    takeField [] []
-                    -- >>= (\val -> trace ("fieldValue: " ++ val) (return val))
-                    >>= (\val ->
-                        let convertedOps = convertRelativeAssignment ("[" ++ (show index) ++  "]") val ops in 
-                            case res of
-                                Empty -> yieldMany (buf ++ val) 
-                                NonEmpty -> yieldMany (buf ++ "," ++ val)
-                            >> processArrayElement convertedOps "" (index + 1) NonEmpty                                
-                    )
-                _ -> 
-                    case res of
-                        -- nothing has been flushed before
-                        Empty -> 
-                            processUnknownValue (subrulesArray index ops) buf
-                            -- >>= (\x -> yield '1' >> return x)
-                            >>= (\val -> case val of
-                                Empty -> processArrayElement ops buf (index + 1) Empty
-                                NonEmpty -> processArrayElement ops "" (index + 1) NonEmpty
-                            )
-                        -- non empty 
-                        NonEmpty -> 
-                            yieldMany buf
-                            >> processUnknownValue (subrulesArray index ops) ","
-                            -- >> yield '!'
-                            >> processArrayElement ops "" (index + 1) NonEmpty      
+                    Just (ArrayAdd v) ->
+                        case res of
+                            Empty -> 
+                                yieldMany buf
+                            NonEmpty -> 
+                                yieldMany buf >> yield ',' 
+                        >> yieldMany v 
+                        >> processArrayElement (removeAdditionRule index ops) "" index NonEmpty
+                    Just FieldRemove -> 
+                        dropField  []
+                        >> processArrayElement ops buf (index + 1) res
+                    Just (FieldAssignD v) -> 
+                        dropField []
+                        >> yieldMany buf
+                        >> case res of
+                                NonEmpty -> yieldMany ("," ++ v)
+                                Empty -> yieldMany (v)
+                        >> processArrayElement ops "" (index + 1) NonEmpty
+                    Just FieldSrc -> 
+                        -- trace "loading field" (return 1) >>
+                        takeField [] []
+                        -- >>= (\val -> trace ("fieldValue: " ++ val) (return val))
+                        >>= (\val ->
+                            let convertedOps = convertRelatives ("[" ++ (show index) ++  "]") val ops in 
+                                case res of
+                                    Empty -> yieldMany (buf ++ val) 
+                                    NonEmpty -> yieldMany (buf ++ "," ++ val)
+                                >> processArrayElement convertedOps "" (index + 1) NonEmpty                                
+                        )
+                    _ -> 
+                        case res of
+                            -- nothing has been flushed before
+                            Empty -> 
+                                processUnknownValue (subrulesArray index ops) buf
+                                -- >>= (\x -> yield '1' >> return x)
+                                >>= (\val -> case val of
+                                    Empty -> processArrayElement ops buf (index + 1) Empty
+                                    NonEmpty -> processArrayElement ops "" (index + 1) NonEmpty
+                                )
+                            -- non empty 
+                            NonEmpty -> 
+                                yieldMany buf
+                                >> processUnknownValue (subrulesArray index ops) ","
+                                -- >> yield '!'
+                                >> processArrayElement ops "" (index + 1) NonEmpty      
     )
 
 

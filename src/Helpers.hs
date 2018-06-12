@@ -57,9 +57,11 @@ relativeSource :: [Char] -> [Op] -> Maybe Action
 relativeSource name ops =
     find (\x -> case x of 
         AssignmentR [v] value -> value == name
+        AddR [v] value -> value == name
         _ -> False
     ) ops
     >>= (\_ -> return FieldSrc)
+
 
 -- | Returns all direct assignments from an operation list
 getDirectAdditions :: [Op] -> [Op]
@@ -68,6 +70,16 @@ getDirectAdditions ops =
         AddD [f] _ -> True
         _ -> False
     ) ops
+
+-- | Checks for addition for a specified index within an array
+arrayAddition :: Int -> [Op] -> Maybe Action
+arrayAddition index ops = 
+    find (\x -> 
+        case x of
+            AddD [f] _ -> appliesToIndex f index 
+            _ -> False
+    ) ops
+    >>= (\(AddD _ val) -> return (ArrayAdd val))
 
 -- | Checks if an operation is applicable to an array index
 appliesToIndex :: [Char] -> Int -> Bool
@@ -86,13 +98,15 @@ reduceRuleLevel ops =
         v -> v
     ) ops
 
--- | Converts a relative assignment to a direct assignmnet - storing the value specified for direct use
-convertRelativeAssignment :: [Char] -> [Char] -> [Op] -> [Op]
-convertRelativeAssignment name value ops =
+-- | Converts a relative assignment or addition to a direct ones - storing the value specified for direct use
+convertRelatives :: [Char] -> [Char] -> [Op] -> [Op]
+convertRelatives name value ops =
     map (\x -> 
         case x of 
             AssignmentR [v] src -> if src == name then AssignmentD [v] value 
                                    else AssignmentR [v] src
+            AddR [v] src -> if src == name then AddD [v] value 
+                            else AddR [v] src
             v -> v 
     ) ops
 
@@ -122,6 +136,15 @@ subrulesArray index ops =
     ) ops
     |> reduceRuleLevel
 
+-- Removes an addition rule for the specified index
+removeAdditionRule :: Int -> [Op] -> [Op]
+removeAdditionRule index ops = 
+    Prelude.filter (\x ->
+        case x of 
+            AddD [f] _ -> not $ appliesToIndex f index
+            _ -> True
+    )  ops
+
 -- | Returns the action that is applicable to the currently processed field
 fieldAction :: [Char] -> [Op] -> Maybe Action
 fieldAction name ops =
@@ -130,7 +153,7 @@ fieldAction name ops =
 -- | Returns the action that is applicable to the currently processed array index
 arrayAction :: Int -> [Op] -> Maybe Action
 arrayAction index ops =
-    removableArray index ops <|> relativeSource name ops <|> assignableDirectlyArray index ops
+    arrayAddition index ops <|> removableArray index ops <|> relativeSource name ops <|> assignableDirectlyArray index ops
     where 
         name = "[" ++ (show index) ++  "]"
     
@@ -169,23 +192,28 @@ dropField stack =
 -- | Returns the value of a whole field, including its subvalues
 takeField :: Monad m => String -> String -> ConduitM Char Char m [Char] 
 takeField [] buf = do
-    val <- takeWhileC (\x -> not $ elem x "[{,}]") .| sinkList
+    val <- takeWhileC (\x -> not $ elem x "[{, }]") .| sinkList
     c <- takeC 1 .| sinkList
+    -- d <- trace c (return 1)
     case c of 
+        " " -> takeField [] (buf ++ val)
         "," -> return (buf ++ val)
-        "]" -> return (buf ++ val)
-        "}" -> return (buf ++ val)
-        "[" -> takeField "[" (buf ++ val)
-        "{" -> takeField "{" (buf ++ val)
+        "]" -> return (buf ++ (']': val))
+        "}" -> return (buf ++ ('}':val))
+        "[" -> takeField "[" (buf ++ val ++ "[")
+        "{" -> takeField "{" (buf ++ val ++ "{")
 
 takeField (e:rest) buf = do
-    val <- takeWhileC (\x -> not $ elem x "[{}]") .| sinkList
-    c <-takeC 1 .| sinkList
+    val <- takeWhileC (\x -> not $ elem x "[{ }]") .| sinkList
+    c <- takeC 1 .| sinkList
+    -- v <- trace (e:rest) (return ())
+    -- d <- trace val (return 1)
     case c of
-        "}" -> takeField (buf ++ val) rest
-        "]" -> takeField (buf ++ val) rest
-        "{" -> takeField (buf ++ val) ('{':e:rest)
-        "[" -> takeField (buf ++ val) ('[':e:rest)
+        " " -> takeField (e:rest) (buf ++ val)
+        "}" -> takeField rest (buf ++ val ++ "}")
+        "]" -> takeField rest (buf ++ val ++ "]") 
+        "{" -> takeField ('{':e:rest) (buf ++ val ++ "{") 
+        "[" -> takeField ('[':e:rest) (buf ++ val ++ "[") 
 
 
 

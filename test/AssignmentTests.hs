@@ -27,6 +27,16 @@ assignFieldNestedObj =
         "{\"0\":{\"a\":\"10\",\"b\":\"bvalue\"},\"1\":{\"a\":1,\"b\":111},\"2\":{\"a\":\"asd\",\"b\":\"bvalue\"}}" 
 
 
+arrayAssignmentRelative :: Test
+arrayAssignmentRelative = 
+    performParsingTest 
+        [".[1]=[0]"] 
+        testValue
+        "[{\"a\":1,\"b\":\"bvalue\"},{\"a\":1,\"b\":\"bvalue\"},{\"a\":\"asd\",\"b\":\"bvalue\"}]" 
+
+        
+        
+
 assignFieldForEvery :: Test 
 assignFieldForEvery =
     performParsingTest 

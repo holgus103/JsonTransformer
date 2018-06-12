@@ -28,6 +28,8 @@ data Action =
         | FieldDst 
         -- | Marks a relative addition source field
         | FieldAddSrc 
+        -- | Signifies an array addition at a certain index 
+        | ArrayAdd String
 
 data ConduitResult =
         -- | Signifies no output for a subconduit
