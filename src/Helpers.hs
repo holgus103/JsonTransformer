@@ -21,7 +21,7 @@ removable fieldName ops =
         Removal [name] -> name == fieldName 
         _ -> False
     ) ops
-    >>= (\(Removal _) -> return (FieldRemove))
+    >>= (\_ -> return (FieldRemove))
 
 removableArray :: Int -> [Op] -> Maybe Action
 removableArray index ops =
@@ -29,7 +29,7 @@ removableArray index ops =
         Removal [v]-> appliesToIndex v index
         _ -> False
     ) ops
-    >>= (\(Removal _) -> return (FieldRemove))
+    >>= (\_ -> return (FieldRemove))
     
 assignableDirectly :: [Char] -> [Op] -> Maybe Action
 assignableDirectly name ops =
@@ -46,6 +46,14 @@ assignableDirectlyArray index ops =
         _ -> False
     ) ops
     >>= (\ (AssignmentD _ v) -> return (FieldAssignD v))
+
+relativeSource :: [Char] -> [Op] -> Maybe Action
+relativeSource name ops =
+    find (\x -> case x of 
+        AssignmentR [v] value -> value == name
+        _ -> False
+    ) ops
+    >>= (\_ -> return FieldSrc)
 
 getDirectAdditions :: [Op] -> [Op]
 getDirectAdditions ops =
@@ -68,6 +76,15 @@ reduceRuleLevel ops =
         AssignmentR (h:t) v -> AssignmentR t v
         AddR (h:t) v -> AddR t v
         v -> v
+    ) ops
+
+convertRelativeAssignment :: [Char] -> [Char] -> [Op] -> [Op]
+convertRelativeAssignment name value ops =
+    map (\x -> 
+        case x of 
+            AssignmentR [v] src -> if src == name then AssignmentD [v] value 
+                                   else AssignmentR [v] src
+            v -> v 
     ) ops
 
 -- filters rules for a field 
@@ -99,16 +116,15 @@ subrulesArray index ops =
 
 fieldAction :: [Char] -> [Op] -> Maybe Action
 fieldAction name ops =
-    (removable name ops)  <|> (assignableDirectly name ops)
+    removable name ops <|> relativeSource name ops  <|> assignableDirectly name ops
 
 arrayAction :: Int -> [Op] -> Maybe Action
 arrayAction index ops =
-    (removableArray index ops) <|> (assignableDirectlyArray index ops)
+    removableArray index ops <|> assignableDirectlyArray index ops
     
 
 -- drops an entire field 
 dropField :: Monad m => [Char] -> CharConduit m
-
 dropField [] =
     dropWhileC (\x -> not $ elem x " {[,}]")
     >> takeC 1 .| sinkList
@@ -143,11 +159,11 @@ takeField [] buf = do
     val <- takeWhileC (\x -> not $ elem x "[{,}]") .| sinkList
     c <- takeC 1 .| sinkList
     case c of 
-        "," -> return buf
-        "]" -> return buf
-        "}" -> return buf
-        "[" -> takeField "[" val
-        "{" -> takeField "{" val
+        "," -> return (buf ++ val)
+        "]" -> return (buf ++ val)
+        "}" -> return (buf ++ val)
+        "[" -> takeField "[" (buf ++ val)
+        "{" -> takeField "{" (buf ++ val)
 
 takeField (e:rest) buf = do
     val <- takeWhileC (\x -> not $ elem x "[{}]") .| sinkList

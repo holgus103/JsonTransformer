@@ -12,12 +12,12 @@ import qualified Data.Text as T
 
 
 args :: IO [String]
-args = return ["test.txt", "a", "del .[0].a.[1]"]
+args = return ["test.txt", "a", ".b=a"]
 
 main :: IO ()
 main = 
-    -- args
-    getArgs 
+    args
+    -- getArgs 
     >>= (\args ->
         if length args < 2 then return ()
         else
@@ -25,17 +25,17 @@ main =
              
                 processArgs opsArgs
                 -- >>=(\ops -> putStrLn (Prelude.concat opsArgs) >> return ops)
-                -- >>= (\ops -> (putStrLn $ show ops) >> return ops)
+                >>= (\ops -> (putStrLn $ show ops) >> return ops)
                 >>= (\ops->
                 runConduitRes $ sourceFile pathIn
                 .| decodeUtf8C 
                 .| Data.Conduit.Text.lines
                 .| linesToChars  
                 .| processUnknownStart ops
-                .| mapC (\x -> T.pack [x])
-                .| encodeUtf8C
-                .| sinkFile pathOut
-                -- .| sinkList
+                -- .| mapC (\x -> T.pack [x])
+                -- .| encodeUtf8C
+                -- .| sinkFile pathOut
+                .| sinkList
                 )
                 >>= (\x -> putStrLn $ show x)
                 >> return ()

@@ -129,7 +129,16 @@ processField ops buf res = do
                                 NonEmpty -> yieldMany ("," ++ fieldName ++ ":" ++ val)
                                 Empty -> yieldMany (fieldName ++ ":" ++ val)
                         >> processField ops "" NonEmpty
-
+                    Just FieldSrc -> 
+                        -- trace "loading field" (return 1) >>
+                        takeField [] []
+                        -- >>= (\val -> trace ("fieldValue: " ++ val) (return val))
+                        >>= (\val ->
+                            case res of
+                                Empty -> yieldMany (buf ++ fieldName ++ ":" ++ val) 
+                                NonEmpty -> yieldMany (buf ++ "," ++ fieldName ++ ":" ++ val)
+                            >> processField (convertRelativeAssignment fieldName val ops) "" NonEmpty
+                        )
                     _ -> 
                         case res of
                             -- nothing has been flushed before
@@ -190,7 +199,14 @@ processArrayElement ops buf index res =
                             NonEmpty -> yieldMany ("," ++ val)
                             Empty -> yieldMany (val)
                     >> processArrayElement ops "" (index + 1) NonEmpty
-
+                -- Just FieldSrc -> do
+                --     val <- takeField [] []
+                --     case res of
+                --         Empty -> yieldMany (buffer ++ "," ++ fieldName ++ ":" ++ val) 
+                --         NonEmpty -> yieldMany (buffer ++ fieldName ++ ":" ++ val)
+                --     convertRelativeAssignment fieldName val ops
+                --     |> 
+                    
                 _ -> 
                     case res of
                         -- nothing has been flushed before
