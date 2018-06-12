@@ -10,7 +10,7 @@ import Data.Char
 import Data.List
 
 
-
+-- | Parses an array of input arguments for operations
 processArgs :: [String] -> IO [Op]
 processArgs args = 
     Prelude.concat args
@@ -18,7 +18,7 @@ processArgs args =
     |> Prelude.map parseOperation 
     |> return
 
-
+-- | Parses a string for an operation and returns it on success
 parseOperation :: String -> Op
 parseOperation s = 
     Prelude.dropWhile (==' ') s
@@ -28,13 +28,7 @@ parseOperation s =
             Nothing -> None
         )
 
-ensureDot :: String -> Maybe String
-ensureDot (x:xs) = 
-    case x of
-        '.' -> Just xs
-        _ -> Nothing
-
-
+-- | Parses a string for a filtering operation and returns it on success
 parseFilter :: String -> Maybe Op
 parseFilter (x:xs) = 
     case x of
@@ -43,7 +37,7 @@ parseFilter (x:xs) =
 
 parseFilter [] = Nothing
 
-
+-- | Parses a string for an addition operation and returns it on success
 parseAdd :: String -> Maybe Op
 parseAdd s = 
     if isPrefixOf "add" s then 
@@ -56,7 +50,7 @@ parseAdd s =
         )
     else Nothing
 
-
+-- | Parses a string for an assignment operation and returns it on success
 parseAssignment :: String -> Maybe Op
 parseAssignment (x:xs) = 
     case x of 
@@ -65,6 +59,7 @@ parseAssignment (x:xs) =
 
 parseAssignment [] = Nothing
 
+-- | Helper function used to get a value for assignment or addition and return an Operation of [String] String 
 parseType :: String -> [String] -> 
     ([String] -> String -> Op) ->
     ([String] -> String -> Op) -> 
@@ -76,6 +71,8 @@ parseType (y:ys) acc d r =
         -- relative assignment
         x -> Just $ r (reverse acc) $ (x:) $ takeWhile (/=' ') ys 
 
+-- | Parses a string to extract subsequent field names and array indices 
+-- | e.g. .message.[0].val becomes ["message", "[0]", "val"]
 fields :: String -> String -> [String] -> 
     ([String] -> String -> Op) ->
     ([String] -> String -> Op) -> 
@@ -86,8 +83,9 @@ fields (y:ys) f acc d r =
                 |> (:acc)
                 |> (\x -> fields ys "" x d r)
         '=' -> parseType ys ((reverse f):acc) d r
-        x -> fields ys (y:f) acc d r             
+        x -> fields ys (y:f) acc d r  
 
+-- | Parses a string for a removal operation and returns it on success
 parseRemove :: String -> Maybe Op
 parseRemove s =
     if isPrefixOf "del" s then 
@@ -99,6 +97,7 @@ parseRemove s =
                 '.' -> processField Removal xs "" []
                 _ -> Nothing)
     else Nothing
+
 
 processField :: ([String] -> Op) -> String -> String -> [String] -> Maybe Op    
 processField op (y:ys) acc res = 

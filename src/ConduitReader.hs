@@ -3,13 +3,14 @@ module ConduitReader where
 import Conduit
 import Enums
 import Data.Text
-import Debug.Trace
+-- import Debug.Trace
 import Flow
 import Helpers
 import Control.Monad
 import Data.List
 import Buffer
 
+-- | Conduit splitting lines into separate chars.
 linesToChars :: Monad m => ConduitM Text Char m ()
 linesToChars = 
     await
@@ -19,6 +20,7 @@ linesToChars =
             Nothing -> return (); 
     )
 
+-- | Starts all parsing of various data.
 processUnknownStart :: Monad m => [Op] -> CharConduit m
 processUnknownStart ops = do
     -- check first character
@@ -35,6 +37,7 @@ processUnknownStart ops = do
         Just x ->  takeWhileC (\x -> x /= '[' && x /= '{') >> (void $ processUnknownStart ops)
     )
 
+-- | Processes an unknown value within an array or object.
 processUnknownValue :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processUnknownValue ops buf = 
     peekC 
@@ -45,7 +48,8 @@ processUnknownValue ops buf =
         Just ' ' -> takeWhileC (==' ') >> processUnknownValue ops buf
         Just x -> yieldMany buf >> processFieldValue >> return NonEmpty
     )
- 
+
+-- | Processes an whole array.
 processArray :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processArray ops buf = 
     dropWhileC (/= '[')
@@ -57,7 +61,7 @@ processArray ops buf =
             NonEmpty -> yield ']' >> return NonEmpty
         )
 
-
+-- | Processes an object.
 processObject :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processObject ops buf =
     -- consume object start
@@ -90,7 +94,7 @@ processObject ops buf =
         where 
             additions = getDirectAdditions ops
 
-
+-- | Executes direct assignments for an object and adds them in the beginning of it.
 flushAdditions :: Monad m => [Op] -> ContainerConduit m
 flushAdditions ops = 
     case ops of
@@ -100,6 +104,7 @@ flushAdditions ops =
             |> Data.List.map (\x -> yieldMany x >> return NonEmpty)
             |> Data.List.head
 
+-- | Processes object fields one by one till the object's end.
 processField :: Monad m => [Op] -> [Char] -> ConduitResult -> ContainerConduit m
 processField ops buf res = do     
     dropWhileC (==' ')
@@ -124,7 +129,6 @@ processField ops buf res = do
                         >> processField ops buf res
                     Just (FieldAssignD val) -> 
                         dropField []
-                        -- d <- trace ("assignment buffer " ++ buf) (return 1)
                         >> yieldMany buf
                         >> case res of
                                 NonEmpty -> yieldMany (",\"" ++ fieldName ++ "\":" ++ val)
@@ -156,7 +160,7 @@ processField ops buf res = do
                                 >> processField ops "" NonEmpty
 
 
-
+-- | Returns a fieldname found within an object.
 getFieldName :: Monad m => ConduitM Char o m [Char]
 getFieldName = 
     -- drop object opening and first quotation mark
@@ -166,14 +170,13 @@ getFieldName =
     -- drop field name end 
     >>= (\y -> dropWhileC (=='\"') >> dropWhileC (\x -> x == ':' || x == ' ')  >> return y)
         
--- simply flushes a field
+-- | Writes a simple value to the output stream, used to process primitive object fields.
 processFieldValue :: Monad m => CharConduit m
 processFieldValue = 
     takeWhileC (\x -> x /= ',' && x /= '}' && x /= ']') .| sinkList
-    -- d <- trace ("field value: " ++ val) (return 1)
     >>= (\val -> dropWhileC (\x -> x == ',') >> yieldMany val)
 
-        
+-- | Processes all array elements one by one, similar to processField.        
 processArrayElement :: Monad m => [Op] -> [Char] -> Int -> ConduitResult -> ContainerConduit m
 processArrayElement ops buf index res = 
     dropWhileC (\x -> elem x ", " )

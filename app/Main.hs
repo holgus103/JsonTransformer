@@ -11,13 +11,14 @@ import Flow
 import qualified Data.Text as T
 
 
-args :: IO [String]
-args = return ["test.txt",  "a", "del .[2]"]
+-- args :: IO [String]
+-- args = return ["test.txt",  "a", "del .[2]"]
 
+-- | Main function, starts the processing of data specified by program arguments .
 main :: IO ()
 main = 
-    args
-    -- getArgs 
+    -- args
+    getArgs 
     >>= (\args ->
         if length args < 2 then return ()
         else
