@@ -8,39 +8,44 @@ import Flow
 import Data.List
 import Control.Applicative
 
+
 type CharConduit m = ConduitM Char Char m ()
 
 type ContainerConduit m = ConduitM Char Char m ConduitResult
 
 
 -- check ops for a matching removal token
-removable :: [Char] -> [Op] -> Maybe Op
+removable :: [Char] -> [Op] -> Maybe Action
 removable fieldName ops = 
     find (\x -> case x of
         Removal [name] -> name == fieldName 
         _ -> False
     ) ops
+    >>= (\(Removal _) -> return (FieldRemove))
 
-removableArray :: Int -> [Op] -> Maybe Op
+removableArray :: Int -> [Op] -> Maybe Action
 removableArray index ops =
     find (\x -> case x of
         Removal [v]-> appliesToIndex v index
         _ -> False
     ) ops
+    >>= (\(Removal _) -> return (FieldRemove))
     
-assignableDirectly :: [Char] -> [Op] -> Maybe Op
+assignableDirectly :: [Char] -> [Op] -> Maybe Action
 assignableDirectly name ops =
     find (\x -> case x of 
         AssignmentD [f] _ -> f == name
         _ -> False 
     ) ops
+    >>= (\ (AssignmentD _ v) -> return (FieldAssignD v)) 
 
-assignableDirectlyArray :: Int -> [Op] -> Maybe Op
+assignableDirectlyArray :: Int -> [Op] -> Maybe Action
 assignableDirectlyArray index ops =
     find (\x -> case x of
         AssignmentD [v] _ -> appliesToIndex v index
         _ -> False
     ) ops
+    >>= (\ (AssignmentD _ v) -> return (FieldAssignD v))
 
 getDirectAdditions :: [Op] -> [Op]
 getDirectAdditions ops =
@@ -92,11 +97,11 @@ subrulesArray index ops =
     |> reduceRuleLevel
 
 
-fieldAction :: [Char] -> [Op] -> Maybe Op
+fieldAction :: [Char] -> [Op] -> Maybe Action
 fieldAction name ops =
     (removable name ops)  <|> (assignableDirectly name ops)
 
-arrayAction :: Int -> [Op] -> Maybe Op
+arrayAction :: Int -> [Op] -> Maybe Action
 arrayAction index ops =
     (removableArray index ops) <|> (assignableDirectlyArray index ops)
     
@@ -104,10 +109,11 @@ arrayAction index ops =
 -- drops an entire field 
 dropField :: Monad m => [Char] -> CharConduit m
 
-dropField [] = do
-    dropWhileC (\x -> not $ elem x "{[,}]")
-    val <- takeC 1 .| sinkList
-    case val of
+dropField [] =
+    dropWhileC (\x -> not $ elem x " {[,}]")
+    >> takeC 1 .| sinkList
+    -- >>= (\val -> trace (show val) (return val))
+    >>= (\val -> case val of
         "{" -> 
             -- trace "pushing { onto the stack" (return 1) >>
             dropField "{"
@@ -118,16 +124,40 @@ dropField [] = do
             dropField "["
         "}" -> 
             leftover '}' >> return ()
+        "]" -> leftover ']' >> return ()    
+    )
 
-dropField stack = do
+dropField stack =
     dropWhileC (\x -> not $ elem x "{[,}]")
-    val <- takeC 1 .| sinkList
-    case val of
-        "{" -> dropField $ trace "pushing { onto the stack" ('{':stack)
-        "[" -> dropField ('[':stack)
-        "}" -> dropField $ Prelude.tail $ trace "taking } from the stack" stack
-        "]" -> dropField $ Prelude.tail stack
-        x -> dropField $ trace ("found" ++ show x) stack
+    >> takeC 1 .| sinkList
+    >>= (\val -> case val of
+            "{" -> dropField $ trace "pushing { onto the stack" ('{':stack)
+            "[" -> dropField ('[':stack)
+            "}" -> dropField $ Prelude.tail $ trace "taking } from the stack" stack
+            "]" -> dropField $ Prelude.tail stack
+            x -> dropField $ trace ("found" ++ show x) stack
+    )
+
+takeField :: Monad m => String -> String -> ConduitM Char Char m [Char] 
+takeField [] buf = do
+    val <- takeWhileC (\x -> not $ elem x "[{,}]") .| sinkList
+    c <- takeC 1 .| sinkList
+    case c of 
+        "," -> return buf
+        "]" -> return buf
+        "}" -> return buf
+        "[" -> takeField "[" val
+        "{" -> takeField "{" val
+
+takeField (e:rest) buf = do
+    val <- takeWhileC (\x -> not $ elem x "[{}]") .| sinkList
+    c <-takeC 1 .| sinkList
+    case c of
+        "}" -> takeField (buf ++ val) rest
+        "]" -> takeField (buf ++ val) rest
+        "{" -> takeField (buf ++ val) ('{':e:rest)
+        "[" -> takeField (buf ++ val) ('[':e:rest)
+
 
 
     

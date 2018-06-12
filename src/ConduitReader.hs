@@ -116,12 +116,12 @@ processField ops buf res = do
                 -- d <- (trace ("processing field " ++ fieldName ++ " " ++ (show $ fieldAction fieldName ops) ++ " ops:" ++ (show ops) ) (return 1) )
                 -- check if field is to be removed
                 case fieldAction fieldName ops of
-                    Just (Removal _) -> 
+                    Just FieldRemove -> 
                         -- drop field
                         dropField []
                         -- >> trace ("dropping field " ++ fieldName ++ " buffer: " ++ buf) (return 1)
                         >> processField ops buf res
-                    Just (AssignmentD _ val) -> 
+                    Just (FieldAssignD val) -> 
                         dropField []
                         -- d <- trace ("assignment buffer " ++ buf) (return 1)
                         >> yieldMany buf
@@ -167,9 +167,9 @@ processFieldValue =
 processArrayElement :: Monad m => [Op] -> [Char] -> Int -> ConduitResult -> ContainerConduit m
 processArrayElement ops buf index res = 
     dropWhileC (\x -> elem x ", " )
-    >> trace ("processing index: " ++ (show index) ++ " buf:" ++ buf) (return 1)
+    -- >> trace ("processing index: " ++ (show index) ++ " buf:" ++ buf) (return 1)
     >> peekC
-    >>= (\v -> trace (show v) (return v))
+    -- >>= (\v -> trace (show v) (return v))
     >>= (\val ->
         case val of
             Nothing -> return Empty
@@ -179,10 +179,10 @@ processArrayElement ops buf index res =
                 NonEmpty -> dropC 1 >> yieldMany buf >> return NonEmpty
             x ->
                 case arrayAction index ops of
-                Just (Removal _) -> 
+                Just FieldRemove -> 
                     dropField  []
-                    >> processArrayElement ops buf index res
-                Just (AssignmentD _ val) -> do
+                    >> processArrayElement ops buf (index + 1) res
+                Just (FieldAssignD val) -> 
                     dropField []
                     -- d <- trace ("assignment buffer " ++ buf) (return 1)
                     >> yieldMany buf

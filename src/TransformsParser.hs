@@ -41,6 +41,8 @@ parseFilter (x:xs) =
         '.' -> processField Filtering xs "" []
         _ -> Nothing
 
+parseFilter [] = Nothing
+
 
 parseAdd :: String -> Maybe Op
 parseAdd s = 
@@ -60,6 +62,8 @@ parseAssignment (x:xs) =
     case x of 
         '.' -> fields xs "" [] AssignmentD AssignmentR
         _ -> Nothing
+
+parseAssignment [] = Nothing
 
 parseType :: String -> [String] -> 
     ([String] -> String -> Op) ->

@@ -14,4 +14,6 @@ data Op = Filtering [String]
         |  Removal [String]
         | None deriving (Show)
 
+data Action = FieldRemove | FieldAssignD String | FieldSrc String String | FieldDst | FieldAddSrc 
+
 data ConduitResult = Empty | NonEmpty

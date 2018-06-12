@@ -8,25 +8,38 @@ import Conduit
 import Control.Monad
 import Data.Conduit.Text
 import Flow
+import qualified Data.Text as T
 
 
 args :: IO [String]
-args = return ["add .[].b=\"11\""]
+args = return ["test.txt", "a", "del .[0].a.[1]"]
 
 main :: IO ()
 main = 
-    args 
-    >>= processArgs 
-    >>= (\ops->
-     runConduitRes $ sourceFile "test.txt" 
-    .| decodeUtf8C 
-    .| Data.Conduit.Text.lines
-    .| linesToChars  
-    .| processUnknownStart ops
-    .| sinkList
+    -- args
+    getArgs 
+    >>= (\args ->
+        if length args < 2 then return ()
+        else
+            let (pathIn:pathOut:opsArgs) = args in 
+             
+                processArgs opsArgs
+                -- >>=(\ops -> putStrLn (Prelude.concat opsArgs) >> return ops)
+                -- >>= (\ops -> (putStrLn $ show ops) >> return ops)
+                >>= (\ops->
+                runConduitRes $ sourceFile pathIn
+                .| decodeUtf8C 
+                .| Data.Conduit.Text.lines
+                .| linesToChars  
+                .| processUnknownStart ops
+                .| mapC (\x -> T.pack [x])
+                .| encodeUtf8C
+                .| sinkFile pathOut
+                -- .| sinkList
+                )
+                >>= (\x -> putStrLn $ show x)
+                >> return ()
     )
-    >>= (\x -> putStrLn $ show x)
-    >> return ()
     
 
 
