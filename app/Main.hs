@@ -12,7 +12,7 @@ import qualified Data.Text as T
 
 
 args :: IO [String]
-args = return ["test.txt", "a", ".[2]=[0]"]
+args = return ["test.txt",  "a", "del .[2]"]
 
 main :: IO ()
 main = 

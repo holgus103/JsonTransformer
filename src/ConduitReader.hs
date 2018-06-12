@@ -8,6 +8,7 @@ import Flow
 import Helpers
 import Control.Monad
 import Data.List
+import Buffer
 
 linesToChars :: Monad m => ConduitM Text Char m ()
 linesToChars = 
@@ -126,7 +127,7 @@ processField ops buf res = do
                         -- d <- trace ("assignment buffer " ++ buf) (return 1)
                         >> yieldMany buf
                         >> case res of
-                                NonEmpty -> yieldMany ("," ++ fieldName ++ ":" ++ val)
+                                NonEmpty -> yieldMany (",\"" ++ fieldName ++ "\":" ++ val)
                                 Empty -> yieldMany (fieldName ++ ":" ++ val)
                         >> processField ops "" NonEmpty
                     Just FieldSrc -> 
@@ -135,15 +136,15 @@ processField ops buf res = do
                         -- >>= (\val -> trace ("fieldValue: " ++ val) (return val))
                         >>= (\val ->
                             case res of
-                                Empty -> yieldMany (buf ++ fieldName ++ ":" ++ val) 
-                                NonEmpty -> yieldMany (buf ++ "," ++ fieldName ++ ":" ++ val)
+                                Empty -> yieldMany (buf ++ "\"" ++ fieldName ++ "\":" ++ val) 
+                                NonEmpty -> yieldMany (buf ++ ",\"" ++ fieldName ++ "\":" ++ val)
                             >> processField (convertRelativeAssignment fieldName val ops) "" NonEmpty
                         )
                     _ -> 
                         case res of
                             -- nothing has been flushed before
                             Empty -> 
-                                processUnknownValue (subrules fieldName ops) (buf ++ fieldName ++ ":")
+                                processUnknownValue (subrules fieldName ops) (buf ++ "\"" ++ fieldName ++ "\":")
                                 >>= (\val -> case val of
                                     Empty -> processField ops buf Empty
                                     NonEmpty -> processField ops "" NonEmpty
@@ -151,7 +152,7 @@ processField ops buf res = do
                             -- non empty 
                             NonEmpty -> 
                                 yieldMany buf
-                                >> processUnknownValue (subrules fieldName ops) (',':fieldName ++ ":")
+                                >> processUnknownValue (subrules fieldName ops) (",\"" ++ fieldName ++ "\":")
                                 >> processField ops "" NonEmpty
 
 
@@ -163,7 +164,7 @@ getFieldName =
     -- get field name
     >> takeWhileC (/='\"') .| sinkList 
     -- drop field name end 
-    >>= (\y -> dropWhileC (\x -> x =='\"' || x == ':' || x == ' ')  >> return y)
+    >>= (\y -> dropWhileC (=='\"') >> dropWhileC (\x -> x == ':' || x == ' ')  >> return y)
         
 -- simply flushes a field
 processFieldValue :: Monad m => CharConduit m
