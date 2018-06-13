@@ -4,7 +4,6 @@ module Helpers where
 
 import Enums
 import Conduit
--- import Debug.Trace
 import Flow
 import Data.List
 import Control.Applicative
@@ -164,13 +163,10 @@ dropField :: Monad m => [Char] -> CharConduit m
 dropField [] =
     dropWhileC (\x -> not $ elem x " {[,}]")
     >> takeC 1 .| sinkList
-    -- >>= (\val -> trace (show val) (return val))
     >>= (\val -> case val of
         "{" -> 
-            -- trace "pushing { onto the stack" (return 1) >>
             dropField "{"
         "," -> 
-            -- trace "found end" (return 1) >>
             return ()
         "[" -> 
             dropField "["
@@ -195,7 +191,6 @@ takeField :: Monad m => String -> String -> ConduitM Char Char m [Char]
 takeField [] buf = do
     val <- takeWhileC (\x -> not $ elem x "[{, }]") .| sinkList
     c <- takeC 1 .| sinkList
-    -- d <- trace c (return 1)
     case c of 
         " " -> takeField [] (buf ++ val)
         "," -> return (buf ++ val)
@@ -207,8 +202,6 @@ takeField [] buf = do
 takeField (e:rest) buf = do
     val <- takeWhileC (\x -> not $ elem x "[{ }]") .| sinkList
     c <- takeC 1 .| sinkList
-    -- v <- trace (e:rest) (return ())
-    -- d <- trace val (return 1)
     case c of
         " " -> takeField (e:rest) (buf ++ val)
         "}" -> takeField rest (buf ++ val ++ "}")

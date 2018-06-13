@@ -3,13 +3,11 @@ module ConduitReader where
 
 import Conduit
 import Enums
-import Data.Text
--- import Debug.Trace  
+import Data.Text  
 import Flow
 import Helpers
 import Control.Monad
 import Data.List
-import Buffer
 
 -- | Conduit splitting lines into separate chars.
 linesToChars :: Monad m => ConduitM Text Char m ()
@@ -67,19 +65,14 @@ processObject :: Monad m => [Op] -> [Char] -> ContainerConduit m
 processObject ops buf =
     -- consume object start
     dropWhileC (== '{')
-    -- >> trace "processing object" (return 1)
-    -- let relatives = getRelativeOps ops
     >> processField ops (buf ++ "{") Empty
     -- consume object end
     >>= (\res -> case res of
         Empty -> 
-            -- trace "object got empty" (return 1) >>
             return Empty
         -- if the buffered values were flushed - the object is not empty
         NonEmpty -> 
             yield '}' 
-            -- >> yield '!'
-            -- >> trace "object got nonempty" (return 1)
             >> return NonEmpty
         )
 
@@ -105,12 +98,10 @@ processField ops buf res = do
     val <- takeC 1 .| sinkList 
     case val of     
         "" ->
-            -- (trace ("returning with " ++ buf) (return 1) >> 
             return res
         x -> 
             -- object end found, flush and return if level is empty
             if x == "}" then
-                -- trace (show ops) (return 1)>>
                 (getDirectAdditions ops |> flushAdditions res)
                 >>= (\r -> case r of 
                     Empty -> return r;
@@ -118,13 +109,11 @@ processField ops buf res = do
                 )
             else do
                 fieldName <- getFieldName
-                -- d <- (trace ("processing field " ++ fieldName ++ " " ++ (show $ fieldAction fieldName ops) ++ " ops:" ++ (show ops) ) (return 1) )
                 -- check if field is to be removed
                 case fieldAction fieldName ops of
                     Just FieldRemove -> 
                         -- drop field
                         dropField []
-                        -- >> trace ("dropping field " ++ fieldName ++ " buffer: " ++ buf) (return 1)
                         >> processField ops buf res
                     Just (FieldAssignD val) -> 
                         dropField []
@@ -134,9 +123,7 @@ processField ops buf res = do
                                 Empty -> yieldMany ("\"" ++ fieldName ++ "\":" ++ val)
                         >> processField ops "" NonEmpty
                     Just FieldSrc -> 
-                        -- trace "loading field" (return 1) >>
                         takeField [] []
-                        -- >>= (\val -> trace ("fieldValue: " ++ val) (return val))
                         >>= (\val ->
                             case res of
                                 Empty -> yieldMany (buf ++ "\"" ++ fieldName ++ "\":" ++ val) 
@@ -180,9 +167,7 @@ processArrayElement :: Monad m => [Op] -> [Char] -> Int -> ConduitResult -> Cont
 processArrayElement ops buf index res =
     -- add fields  
     dropWhileC (\x -> elem x ", " )
-    -- >> trace ("processing index: " ++ (show index) ++ " buf:" ++ buf) (return 1)
     >> peekC
-    -- >>= (\v -> trace (show v) (return v))
     >>= (\val ->
         case val of
             Nothing -> return Empty
@@ -211,9 +196,7 @@ processArrayElement ops buf index res =
                                 Empty -> yieldMany (v)
                         >> processArrayElement ops "" (index + 1) NonEmpty
                     Just FieldSrc -> 
-                        -- trace "loading field" (return 1) >>
                         takeField [] []
-                        -- >>= (\val -> trace ("fieldValue: " ++ val) (return val))
                         >>= (\val ->
                             let convertedOps = convertRelatives ("[" ++ (show index) ++  "]") val ops in 
                                 case res of
@@ -226,7 +209,6 @@ processArrayElement ops buf index res =
                             -- nothing has been flushed before
                             Empty -> 
                                 processUnknownValue (subrulesArray index ops) buf
-                                -- >>= (\x -> yield '1' >> return x)
                                 >>= (\val -> case val of
                                     Empty -> processArrayElement ops buf (index + 1) Empty
                                     NonEmpty -> processArrayElement ops "" (index + 1) NonEmpty
@@ -235,7 +217,6 @@ processArrayElement ops buf index res =
                             NonEmpty -> 
                                 yieldMany buf
                                 >> processUnknownValue (subrulesArray index ops) ","
-                                -- >> yield '!'
                                 >> processArrayElement ops "" (index + 1) NonEmpty      
     )
 

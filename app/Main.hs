@@ -11,13 +11,9 @@ import Flow
 import qualified Data.Text as T
 
 
--- args :: IO [String]
--- args = return ["test.txt",  "a", "del .[2]"]
-
 -- | Main function, starts the processing of data specified by program arguments .
 main :: IO ()
 main = 
-    -- args
     getArgs 
     >>= (\args ->
         if length args < 2 then return ()
@@ -25,8 +21,6 @@ main =
             let (pathIn:pathOut:opsArgs) = args in 
              
                 processArgs opsArgs
-                -- >>=(\ops -> putStrLn (Prelude.concat opsArgs) >> return ops)
-                >>= (\ops -> (putStrLn $ "Operations to be executed: " ++ (show ops)) >> return ops)
                 >>= (\ops->
                 runConduitRes $ sourceFile pathIn
                 .| decodeUtf8C 
@@ -36,9 +30,7 @@ main =
                 .| mapC (\x -> T.pack [x])
                 .| encodeUtf8C
                 .| sinkFile pathOut
-                -- .| sinkList
                 )
-                -- >>= (\x -> putStrLn $ show x)
                 >> return ()
     )
     
