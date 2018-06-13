@@ -1,3 +1,4 @@
+-- | This module contains helper functions used during parsing
 module Helpers where 
 
 
@@ -136,7 +137,7 @@ subrulesArray index ops =
     ) ops
     |> reduceRuleLevel
 
--- Removes an addition rule for the specified index
+-- | Removes an addition rule for the specified index
 removeAdditionRule :: Int -> [Op] -> [Op]
 removeAdditionRule index ops = 
     Prelude.filter (\x ->

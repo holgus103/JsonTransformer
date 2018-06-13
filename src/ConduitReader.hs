@@ -1,3 +1,4 @@
+-- | This module contains several conduits used for parsing parts or whole JSON data
 module ConduitReader where 
 
 import Conduit

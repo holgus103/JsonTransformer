@@ -1,3 +1,5 @@
+-- | This module includes functions related to parsing the user command line input 
+-- | and producing the corresponding operations
 module TransformsParser where 
 
 import System.Environment
@@ -98,7 +100,7 @@ parseRemove s =
                 _ -> Nothing)
     else Nothing
 
-
+-- | Used to extract fields from a string containing a delete or a filter operation
 processField :: ([String] -> Op) -> String -> String -> [String] -> Maybe Op    
 processField op (y:ys) acc res = 
     case y of 

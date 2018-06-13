@@ -3,6 +3,7 @@ import Test.HUnit
 import DeletionTests
 import AdditionTests
 import AssignmentTests
+import MultiOpTests
 import Control.Monad
 
 
@@ -28,7 +29,8 @@ tests = TestList [
     TestLabel "arrayAssignmentRelative" arrayAssignmentRelative,
     TestLabel "relativeAdd" relativeAdd,
     TestLabel "arrayAddition" arrayAddition,
-    TestLabel "arrayAdditionRelative" arrayAdditionRelative
+    TestLabel "arrayAdditionRelative" arrayAdditionRelative,
+    TestLabel "severalOpsTest" severalOpsTest
     ]
 
 main :: IO ()

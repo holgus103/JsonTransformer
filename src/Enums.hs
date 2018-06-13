@@ -1,5 +1,7 @@
+-- | This module comprises several data types helping to produce efficient control flow 
 module Enums where 
 
+-- | Represents various operations to be executed while parsing the incoming JSON stream
 data Op =
         -- | Represents a filtering operation with an array of strings representing fields
         Filtering [String]
@@ -16,7 +18,7 @@ data Op =
         -- | No operation
         | None deriving (Show)
 
- 
+-- | Represents a single action that needs to be executed for a field during its processing
 data Action = 
         -- | Remove field action
         FieldRemove 
@@ -31,6 +33,7 @@ data Action =
         -- | Signifies an array addition at a certain index 
         | ArrayAdd String
 
+-- | Signifies a conduits result and serves as information for parent conduits
 data ConduitResult =
         -- | Signifies no output for a subconduit
         Empty 
