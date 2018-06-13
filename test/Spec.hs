@@ -25,7 +25,7 @@ tests = TestList [
     TestLabel "assignFieldNestedObj" assignFieldNestedObj,
     TestLabel "assignFieldForEvery" assignFieldForEvery,
     TestLabel "assignArray" assignArray,
-    TestLabel "arrayAssignmentRelative" arrayAssignmentRelative,
+    TestLabel "arrayAssignmentRelative" arrayAssignmentRelative,    
     TestLabel "relativeAdd" relativeAdd,
     TestLabel "arrayAddition" arrayAddition,
     TestLabel "arrayAdditionRelative" arrayAdditionRelative

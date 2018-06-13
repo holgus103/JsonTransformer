@@ -1,5 +1,8 @@
 module Enums where 
 
+
+type Buffer = [(String, String)]
+
 data Op =
         -- | Represents a filtering operation with an array of strings representing fields
         Filtering [String]
@@ -33,6 +36,6 @@ data Action =
 
 data ConduitResult =
         -- | Signifies no output for a subconduit
-        Empty 
+        Empty Buffer
         -- | Signifies that the subconduit has written some data to the output stream
-        | NonEmpty
+        | NonEmpty Buffer

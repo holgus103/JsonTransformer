@@ -1,29 +1,39 @@
 module Buffer where 
 
--- import Data.List
--- import Conduit
--- import Helpers
+import Data.List
+import Conduit
+import Enums
+import Flow
 
--- type Buffer = [(String, String)]
 
--- (+=) :: Buffer -> String -> Buffer
--- infixr 7 +=
--- (+=) buf val =
---     (init buf) ++ [(t, l ++ val)]
---     where 
---      (t, l) = last buf 
+write :: Buffer -> String -> Buffer
+write [] val =
+    [("", val)]
 
--- flush :: Monad m => String -> Buffer ->  CharConduit m
--- flush name buf =
---     helper name buf
---     where 
---         -- helper ::        
---         helper name [(t,l)] =  
---             if name == t || t == "" then 
---                 yieldMany l
---             else return ()
+write buf val = 
+    let (t,l) = last buf in 
+        (init buf) ++ [(t, l ++ val)]   
+    
+addBuffer :: Buffer -> String -> Buffer
+addBuffer buf name = 
+    buf ++ [(name, [])]
 
---         helper name ((t,l):rest) =
---             if name == t || t == "" then 
---                 yieldMany l >> helper name rest
---             else return ()
+yieldBuffer :: Monad m => Buffer -> String -> ConduitM Char Char m Buffer 
+yieldBuffer buf val =
+    write buf val 
+    |> flush
+
+flush :: Monad m => Buffer -> ConduitM Char Char m Buffer
+flush buf =
+    helper "" buf
+    where 
+        -- helper ::        
+        helper name list@[(t,l)] =  
+            if name == t || t == "" then 
+                yieldMany l >> return []
+            else return list
+
+        helper name list@((t,l):rest) =
+            if name == t || t == "" then 
+                yieldMany l >> helper name rest
+            else return list
